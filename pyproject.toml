@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kogni-flow"
+version = "0.1.0"
+description = "Auto-instrumentation for LangGraph apps -- enable_flow(app) traces every node and every pydantic-ai agent call, zero code changes at any call site."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "Kogniphy" }]
+keywords = ["langgraph", "observability", "tracing", "pydantic-ai", "llm", "agents"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Debuggers",
+]
+
+# langchain_core only -- LangGraph's own dependency, so already present in
+# any project this package is useful in. pydantic-ai is deliberately NOT a
+# hard dependency: the per-agent token/latency patch is best-effort and
+# activates only if pydantic_ai is importable (see instrumentation.py) --
+# node-level tracing works regardless of what LLM library is used inside
+# each node.
+dependencies = [
+    "langchain-core>=0.3",
+]
+
+[project.optional-dependencies]
+pydantic-ai = ["pydantic-ai>=0.1"]
+dev = ["pytest>=7.0", "langgraph>=0.2", "pydantic-ai>=0.1"]
+
+[project.urls]
+Homepage = "https://github.com/kogniphy/kogni-flow"
+Issues = "https://github.com/kogniphy/kogni-flow/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kogni_langgraph_flow"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
