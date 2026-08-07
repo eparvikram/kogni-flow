@@ -34,8 +34,8 @@ pydantic-ai = ["pydantic-ai>=0.1"]
 dev = ["pytest>=7.0", "langgraph>=0.2", "pydantic-ai>=0.1"]
 
 [project.urls]
-Homepage = "https://github.com/kogniphy/kogni-flow"
-Issues = "https://github.com/kogniphy/kogni-flow/issues"
+Homepage = "https://github.com/eparvikram/kogni-flow"
+Issues = "https://github.com/eparvikram/kogni-flow/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kogni_langgraph_flow"]
