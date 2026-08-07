@@ -36,7 +36,7 @@ up as real parent/child hierarchy, not a flat list.
 ## Output
 
 ```
-FLOW TRACE-5ed8fdcf
+FLOW TRACE-1b955c75
 
 Flow
 classify
@@ -44,18 +44,20 @@ classify
 respond
 `-- responder_agent
 
-Node/Agent           Input    Output     Latency   Status
----------------------------------------------------------
-classify                 -         -      2250ms       OK
-classifier_agent        23         3      2250ms       OK
-respond                  -         -      1265ms       OK
-responder_agent         19        10      1265ms       OK
----------------------------------------------------------
-Total                   42        13
+Node/Agent        Model     Input    Output     Latency   Status
+----------------------------------------------------------------
+classify          -             -         -        16ms       OK
+classifier_agent  test         51         4        16ms       OK
+respond           -             -         -         0ms       OK
+responder_agent   test         51         4         0ms       OK
+----------------------------------------------------------------
+Total                         102         8
 
-Top-level time:   3.51s
-End-to-end turn:  3.53s
+Top-level time:   0.02s
+End-to-end turn:  0.01s
 ```
+
+(`Model` reads the real model identifier off the agent, e.g. `gpt-4o-mini` for a real OpenAI-backed agent — shown as `test` here since this example uses pydantic-ai's no-API-key test model. `-` for a plain LangGraph node, which doesn't call a model itself.)
 
 `Top-level time` sums only top-level (no-parent) entries' latency, not
 every row — a nested entry's time is already contained within its

@@ -157,6 +157,11 @@ def patch_pydantic_ai_agent() -> bool:
         parent_span_id = flow_context.current_span_id()
         sequence = flow_tracer.next_sequence(trace_id)
         span_id = f"SPAN-{id(self):x}-{sequence}"
+        # getattr, not self.model.model_name directly -- not every Model
+        # subclass is guaranteed to expose model_name, and a missing name
+        # should show as "-" downstream (formatter.py), never crash the
+        # whole trace.
+        model_name = getattr(self.model, "model_name", None)
         start = time.monotonic()
         try:
             with flow_context.push_span(span_id):
@@ -166,7 +171,8 @@ def patch_pydantic_ai_agent() -> bool:
             agent_name = self.name or f"pydantic_ai_agent_{id(self):x}"
             flow_tracer.record(trace_id, AgentTrace(
                 trace_id=trace_id, span_id=span_id, parent_span_id=parent_span_id, sequence=sequence,
-                agent_name=agent_name, latency_ms=latency_ms, status="failed", error_type=type(exc).__name__,
+                agent_name=agent_name, model_name=model_name, latency_ms=latency_ms,
+                status="failed", error_type=type(exc).__name__,
             ))
             raise
 
@@ -175,7 +181,8 @@ def patch_pydantic_ai_agent() -> bool:
         usage = extract_usage(result)
         flow_tracer.record(trace_id, AgentTrace(
             trace_id=trace_id, span_id=span_id, parent_span_id=parent_span_id, sequence=sequence,
-            agent_name=agent_name, input_tokens=usage.input_tokens, output_tokens=usage.output_tokens,
+            agent_name=agent_name, model_name=model_name,
+            input_tokens=usage.input_tokens, output_tokens=usage.output_tokens,
             latency_ms=latency_ms,
         ))
         return result

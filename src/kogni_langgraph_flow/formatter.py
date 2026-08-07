@@ -59,7 +59,11 @@ def format_flow(trace_id: Optional[str] = None) -> str:
     lines.append("")
 
     name_width = max(len("Node/Agent"), max(len(e.agent_name) for e in executions))
-    header = f"{'Node/Agent':<{name_width}}  {'Input':>8}  {'Output':>8}  {'Latency':>10}  {'Status':>7}"
+    model_width = max(len("Model"), max(len(e.model_name or "-") for e in executions))
+    header = (
+        f"{'Node/Agent':<{name_width}}  {'Model':<{model_width}}  "
+        f"{'Input':>8}  {'Output':>8}  {'Latency':>10}  {'Status':>7}"
+    )
     separator = "-" * len(header)
     lines.append(header)
     lines.append(separator)
@@ -67,11 +71,13 @@ def format_flow(trace_id: Optional[str] = None) -> str:
     total_in, total_out, top_level_latency = 0, 0, 0.0
     for e in executions:
         status = "OK" if e.status == "completed" else "ERROR"
+        model_str = e.model_name or "-"
         in_str = _fmt_int(e.input_tokens)
         out_str = _fmt_int(e.output_tokens)
         latency_str = f"{e.latency_ms:.0f}ms" if e.latency_ms is not None else "-"
         lines.append(
-            f"{e.agent_name:<{name_width}}  {in_str:>8}  {out_str:>8}  {latency_str:>10}  {status:>7}"
+            f"{e.agent_name:<{name_width}}  {model_str:<{model_width}}  "
+            f"{in_str:>8}  {out_str:>8}  {latency_str:>10}  {status:>7}"
         )
         if e.status != "completed" and e.error_type:
             lines.append(f"{'':<{name_width}}  Error: {e.error_type}")
@@ -89,7 +95,7 @@ def format_flow(trace_id: Optional[str] = None) -> str:
             top_level_latency += e.latency_ms or 0.0
 
     lines.append(separator)
-    lines.append(f"{'Total':<{name_width}}  {_fmt_int(total_in):>8}  {_fmt_int(total_out):>8}")
+    lines.append(f"{'Total':<{name_width}}  {'':<{model_width}}  {_fmt_int(total_in):>8}  {_fmt_int(total_out):>8}")
     lines.append("")
     lines.append(f"Top-level time:   {top_level_latency / 1000:.2f}s")
     turn_latency_ms = _turn_latency_ms(turn)

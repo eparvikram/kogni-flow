@@ -32,6 +32,7 @@ class AgentTrace:
     parent_span_id: Optional[str]
     sequence: int
     agent_name: str
+    model_name: Optional[str] = None  # None for a plain LangGraph node -- only agent calls have a model
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     latency_ms: Optional[float] = None
