@@ -36,28 +36,25 @@ up as real parent/child hierarchy, not a flat list.
 ## Output
 
 ```
-FLOW TRACE-2ee6ea66
+FLOW TRACE-58ce6b38
 
 Flow
-classify
-`-- classifier_agent
-respond
-`-- responder_agent
+classifier_agent -> responder_agent
 
-Node/Agent        Model   Input(token)  Output(token)     Latency   Status
---------------------------------------------------------------------------
-classify          -                  -              -         0ms       OK
-classifier_agent  test              51              4         0ms       OK
-respond           -                  -              -         0ms       OK
-responder_agent   test              51              4         0ms       OK
---------------------------------------------------------------------------
-Total                              102              8
+Node/Agent        Model  Input                             Output                             Input(token)  Output(token)     Latency   Status
+----------------------------------------------------------------------------------------------------------------------------------------------
+classifier_agent  test   What time is it?                  success (no tool calls)                      55              4         0ms       OK
+responder_agent   test   What time is it?                  success (no tool calls)                      55              4         0ms       OK
+----------------------------------------------------------------------------------------------------------------------------------------------
+Total                                                                                                  110              8
 
 Top-level time:   0.00s
-End-to-end turn:  0.01s
+End-to-end turn:  0.02s
 ```
 
-(`Model` reads the real model identifier off the agent, e.g. `gpt-4o-mini` for a real OpenAI-backed agent — shown as `test` here since this example uses pydantic-ai's no-API-key test model. `-` for a plain LangGraph node, which doesn't call a model itself.)
+(`Model` reads the real model identifier off the agent, e.g. `gpt-4o-mini` for a real OpenAI-backed agent — shown as `test` here since this example uses pydantic-ai's no-API-key test model. `Input`/`Output` are the real prompt/reply text, captured only for a plain-string pydantic-ai call — truncated to 32 characters, `-` for anything that isn't a plain string.)
+
+A plain LangGraph node whose only child is exactly one agent call is shown as a single row, not two — see [Node/agent merging](#nodeagent-merging) below for when that does and doesn't apply.
 
 `Top-level time` sums only top-level (no-parent) entries' latency, not
 every row — a nested entry's time is already contained within its
@@ -113,6 +110,23 @@ naming convention required on your part, as long as the agent is a
 plain module/function-local variable (not, say, an item inside a list
 literal that's never bound to its own name, which falls back to an
 id-based placeholder).
+
+## Node/agent merging
+
+A LangGraph node whose only child is exactly one agent call — the common
+"one node, one model call" shape — is collapsed into a single row in
+`print_flow()`/`format_flow()`, instead of showing the node and its
+agent as two separate rows with the same latency and status repeated.
+The node's real span/parent-span identity is kept (so it still nests
+correctly under any real ancestor); the agent's name, model, text, and
+tokens are what's shown.
+
+This only ever affects display, never the underlying trace: `get_trace()`
+still returns both entries, untouched, exactly as recorded. And it only
+merges when there's genuinely nothing to lose — a node with zero
+children, more than one child, or a child that isn't a plain leaf agent
+call (e.g. it calls another agent internally) keeps its full real
+hierarchy, since collapsing those would silently drop information.
 
 ## Known limitation
 

@@ -115,6 +115,23 @@ class FlowCallbackHandler(BaseCallbackHandler):
 _patched = False
 
 
+def _extract_prompt_text(args: Any, kwargs: Dict[str, Any]) -> Optional[str]:
+    """run_sync's first positional arg (or its user_prompt kwarg) is the
+    prompt for a plain string call -- None for anything else (a
+    message_history-based call with no new prompt, multi-modal content,
+    etc.), rather than guessing at a stringified representation."""
+    candidate = args[0] if args else kwargs.get("user_prompt")
+    return candidate if isinstance(candidate, str) else None
+
+
+def _extract_output_text(result: Any) -> Optional[str]:
+    """result.output is only a plain string when the agent has no
+    output_type set -- a structured output_type gives back a Pydantic
+    model/dict instead, which is deliberately not stringified here."""
+    output = getattr(result, "output", None)
+    return output if isinstance(output, str) else None
+
+
 def _infer_caller_name(target: Any) -> Optional[str]:
     """Same frame-walk as pydantic-ai's own Agent._infer_name, but from
     THIS function's caller (traced_run_sync) up to ITS caller -- i.e.
@@ -162,6 +179,7 @@ def patch_pydantic_ai_agent() -> bool:
         # should show as "-" downstream (formatter.py), never crash the
         # whole trace.
         model_name = getattr(self.model, "model_name", None)
+        input_text = _extract_prompt_text(args, kwargs)
         start = time.monotonic()
         try:
             with flow_context.push_span(span_id):
@@ -171,7 +189,7 @@ def patch_pydantic_ai_agent() -> bool:
             agent_name = self.name or f"pydantic_ai_agent_{id(self):x}"
             flow_tracer.record(trace_id, AgentTrace(
                 trace_id=trace_id, span_id=span_id, parent_span_id=parent_span_id, sequence=sequence,
-                agent_name=agent_name, model_name=model_name, latency_ms=latency_ms,
+                agent_name=agent_name, model_name=model_name, input_text=input_text, latency_ms=latency_ms,
                 status="failed", error_type=type(exc).__name__,
             ))
             raise
@@ -182,6 +200,7 @@ def patch_pydantic_ai_agent() -> bool:
         flow_tracer.record(trace_id, AgentTrace(
             trace_id=trace_id, span_id=span_id, parent_span_id=parent_span_id, sequence=sequence,
             agent_name=agent_name, model_name=model_name,
+            input_text=input_text, output_text=_extract_output_text(result),
             input_tokens=usage.input_tokens, output_tokens=usage.output_tokens,
             latency_ms=latency_ms,
         ))

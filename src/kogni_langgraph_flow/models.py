@@ -33,6 +33,15 @@ class AgentTrace:
     sequence: int
     agent_name: str
     model_name: Optional[str] = None  # None for a plain LangGraph node -- only agent calls have a model
+    # Captured only for a pydantic-ai agent call whose prompt/output are
+    # plain strings (see instrumentation.py's _extract_prompt_text/
+    # _extract_output_text) -- None for a plain LangGraph node, or when
+    # the prompt/output isn't a simple string (message_history-based
+    # calls, structured output_type, multi-modal content). Kept in-memory
+    # only, same as the rest of this record (see tracer.py's storage
+    # model) -- nothing here is persisted to disk.
+    input_text: Optional[str] = None
+    output_text: Optional[str] = None
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     latency_ms: Optional[float] = None

@@ -117,6 +117,17 @@ def test_format_flow_renders_a_table():
 
     text = format_flow(current_trace_id())
     assert "Flow" in text
-    assert "classify" in text
     assert "classifier_agent" in text
     assert "Top-level time:" in text
+
+
+def test_format_flow_merges_a_node_with_its_one_agent_call():
+    # classify_node's only child is classifier_agent's single run_sync
+    # call -- the "one node, one model call" shape collapses into a
+    # single row instead of showing the node and its agent separately.
+    app, *_ = _build_app()
+    app.invoke({"question": "hello", "answer": ""})
+
+    text = format_flow(current_trace_id())
+    assert "classify" not in text.replace("classifier_agent", "")
+    assert "respond" not in text.replace("responder_agent", "")

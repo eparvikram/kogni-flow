@@ -6,11 +6,55 @@ and the actual wall-clock turn latency, since they diverge whenever
 work runs concurrently.
 """
 
-from typing import List, Optional
+from dataclasses import replace
+from typing import Dict, List, Optional
 
 from .context import current_trace_id
 from .models import AgentTrace, TurnRecord
 from .tracer import get_trace
+
+
+def _merge_node_agent_pairs(executions: List[AgentTrace]) -> List[AgentTrace]:
+    """Collapse a plain node whose ONLY child is exactly one agent call
+    into a single row -- the common "one node, just wraps one model
+    call" shape, where the node is pure plumbing and showing it as a
+    separate row from the agent just repeats the same latency/status
+    twice for no new information. Takes the node's span_id/parent_span_id
+    (so it still nests correctly under any real ancestor) but the
+    agent's name/model/text/tokens (the actually meaningful data).
+
+    Left alone (real hierarchy preserved) whenever there's something
+    genuinely to show: a node with zero children, multiple children, or
+    a child that isn't a plain leaf agent call -- merging those would
+    either have nothing to merge or would silently drop information."""
+    by_parent: Dict[Optional[str], List[AgentTrace]] = {}
+    for e in executions:
+        by_parent.setdefault(e.parent_span_id, []).append(e)
+
+    merged_child_span_ids = set()
+    result: List[AgentTrace] = []
+    for e in executions:
+        if e.span_id in merged_child_span_ids:
+            continue
+        children = by_parent.get(e.span_id, [])
+        if e.model_name is None and len(children) == 1:
+            child = children[0]
+            if child.model_name is not None and not by_parent.get(child.span_id):
+                merged_child_span_ids.add(child.span_id)
+                result.append(replace(
+                    e,
+                    agent_name=child.agent_name,
+                    model_name=child.model_name,
+                    input_text=child.input_text,
+                    output_text=child.output_text,
+                    input_tokens=child.input_tokens,
+                    output_tokens=child.output_tokens,
+                    status=child.status if e.status == "completed" else e.status,
+                    error_type=child.error_type or e.error_type,
+                ))
+                continue
+        result.append(e)
+    return result
 
 
 def _format_flow(executions: List[AgentTrace]) -> List[str]:
@@ -42,6 +86,16 @@ def _fmt_int(value: Optional[int]) -> str:
     return f"{value:,}" if value is not None else "-"
 
 
+_TEXT_WIDTH = 32  # truncated display width for the Input/Output text columns
+
+
+def _fmt_text(value: Optional[str], width: int = _TEXT_WIDTH) -> str:
+    if value is None:
+        return "-"
+    value = value.replace("\n", " ").strip()
+    return value if len(value) <= width else value[: width - 1] + "…"
+
+
 def format_flow(trace_id: Optional[str] = None) -> str:
     trace_id = trace_id or current_trace_id()
     if not trace_id:
@@ -51,7 +105,7 @@ def format_flow(trace_id: Optional[str] = None) -> str:
     if not turn or not turn.executions:
         return f"No node/agent executions recorded for trace_id={trace_id!r}."
 
-    executions = sorted(turn.executions, key=lambda e: e.sequence)
+    executions = _merge_node_agent_pairs(sorted(turn.executions, key=lambda e: e.sequence))
 
     lines = [f"FLOW {trace_id}", ""]
     lines.append("Flow")
@@ -61,8 +115,10 @@ def format_flow(trace_id: Optional[str] = None) -> str:
     name_width = max(len("Node/Agent"), max(len(e.agent_name) for e in executions))
     model_width = max(len("Model"), max(len(e.model_name or "-") for e in executions))
     token_width = 13  # fits "Output(token)", the wider of the two token column labels
+    in_text_width = out_text_width = _TEXT_WIDTH
     header = (
         f"{'Node/Agent':<{name_width}}  {'Model':<{model_width}}  "
+        f"{'Input':<{in_text_width}}  {'Output':<{out_text_width}}  "
         f"{'Input(token)':>{token_width}}  {'Output(token)':>{token_width}}  {'Latency':>10}  {'Status':>7}"
     )
     separator = "-" * len(header)
@@ -73,11 +129,14 @@ def format_flow(trace_id: Optional[str] = None) -> str:
     for e in executions:
         status = "OK" if e.status == "completed" else "ERROR"
         model_str = e.model_name or "-"
+        in_text_str = _fmt_text(e.input_text, in_text_width)
+        out_text_str = _fmt_text(e.output_text, out_text_width)
         in_str = _fmt_int(e.input_tokens)
         out_str = _fmt_int(e.output_tokens)
         latency_str = f"{e.latency_ms:.0f}ms" if e.latency_ms is not None else "-"
         lines.append(
             f"{e.agent_name:<{name_width}}  {model_str:<{model_width}}  "
+            f"{in_text_str:<{in_text_width}}  {out_text_str:<{out_text_width}}  "
             f"{in_str:>{token_width}}  {out_str:>{token_width}}  {latency_str:>10}  {status:>7}"
         )
         if e.status != "completed" and e.error_type:
@@ -97,7 +156,7 @@ def format_flow(trace_id: Optional[str] = None) -> str:
 
     lines.append(separator)
     lines.append(
-        f"{'Total':<{name_width}}  {'':<{model_width}}  "
+        f"{'Total':<{name_width}}  {'':<{model_width}}  {'':<{in_text_width}}  {'':<{out_text_width}}  "
         f"{_fmt_int(total_in):>{token_width}}  {_fmt_int(total_out):>{token_width}}"
     )
     lines.append("")

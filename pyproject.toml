@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kogni-flow"
-version = "0.1.0"
+version = "0.1.1"
 description = "Auto-instrumentation for LangGraph apps -- enable_flow(app) traces every node and every pydantic-ai agent call, zero code changes at any call site."
 readme = "README.md"
 license = { text = "MIT" }
