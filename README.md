@@ -36,7 +36,7 @@ up as real parent/child hierarchy, not a flat list.
 ## Output
 
 ```
-FLOW TRACE-1b955c75
+FLOW TRACE-2ee6ea66
 
 Flow
 classify
@@ -44,16 +44,16 @@ classify
 respond
 `-- responder_agent
 
-Node/Agent        Model     Input    Output     Latency   Status
-----------------------------------------------------------------
-classify          -             -         -        16ms       OK
-classifier_agent  test         51         4        16ms       OK
-respond           -             -         -         0ms       OK
-responder_agent   test         51         4         0ms       OK
-----------------------------------------------------------------
-Total                         102         8
+Node/Agent        Model   Input(token)  Output(token)     Latency   Status
+--------------------------------------------------------------------------
+classify          -                  -              -         0ms       OK
+classifier_agent  test              51              4         0ms       OK
+respond           -                  -              -         0ms       OK
+responder_agent   test              51              4         0ms       OK
+--------------------------------------------------------------------------
+Total                              102              8
 
-Top-level time:   0.02s
+Top-level time:   0.00s
 End-to-end turn:  0.01s
 ```
 
