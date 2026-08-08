@@ -14,12 +14,13 @@ instrumentation.py).
 
 from .adapters import register_adapter
 from .api import enable_flow
-from .formatter import format_flow, print_flow
+from .formatter import format_flow, format_flow_summary, print_flow, print_flow_summary
 from .tracer import clear_all, clear_trace, get_trace
 
 __all__ = [
     "enable_flow",
     "print_flow", "format_flow",
+    "print_flow_summary", "format_flow_summary",
     "get_trace", "clear_trace", "clear_all",
     "register_adapter",
 ]

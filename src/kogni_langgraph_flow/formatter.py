@@ -197,3 +197,80 @@ def _turn_latency_ms(turn: TurnRecord) -> Optional[float]:
 
 def print_flow(trace_id: Optional[str] = None) -> None:
     print(format_flow(trace_id))
+
+
+def _row_type(e: AgentTrace) -> str:
+    return "Agent" if e.model_name is not None else "Node"
+
+
+def format_flow_summary(trace_id: Optional[str] = None) -> str:
+    """A denser alternative to format_flow() -- no Flow tree, no Input/
+    Output text, just Type (Agent/Node) + Model + tokens + latency, plus
+    Agent time vs Node time summed separately instead of one combined
+    Top-level time -- for when you want "was this turn slow because of
+    LLM calls or because of my own node logic", not the full detail
+    view. Same underlying merge/dedup as format_flow(); the two are
+    independent views over the same trace, not one derived from the
+    other."""
+    trace_id = trace_id or current_trace_id()
+    if not trace_id:
+        return "No trace_id given and no current turn -- call enable_flow(app) and invoke it first."
+
+    turn: Optional[TurnRecord] = get_trace(trace_id)
+    if not turn or not turn.executions:
+        return f"No node/agent executions recorded for trace_id={trace_id!r}."
+
+    executions = _merge_node_agent_pairs(sorted(turn.executions, key=lambda e: e.sequence))
+
+    name_width = max(len("Node/Agent"), max(len(e.agent_name) for e in executions))
+    type_width = max(len("Type"), len("Agent"), len("Node"))
+    model_width = max(len("Model"), max(len(e.model_name or "-") for e in executions))
+    token_width = len("Output Tok")
+
+    header = (
+        f"{'Node/Agent':<{name_width}}  {'Type':<{type_width}}  {'Model':<{model_width}}  "
+        f"{'Input Tok':>{token_width}}  {'Output Tok':>{token_width}}  {'Latency':>10}  {'Status':>7}"
+    )
+    separator = "-" * len(header)
+    lines = [f"FLOW {trace_id}", "", header, separator]
+
+    total_in = total_out = 0
+    agent_time_ms = node_time_ms = 0.0
+    for e in executions:
+        row_type = _row_type(e)
+        status = "OK" if e.status == "completed" else "ERROR"
+        model_str = e.model_name or "-"
+        in_str = _fmt_int(e.input_tokens)
+        out_str = _fmt_int(e.output_tokens)
+        latency_str = f"{e.latency_ms:.0f}ms" if e.latency_ms is not None else "-"
+        lines.append(
+            f"{e.agent_name:<{name_width}}  {row_type:<{type_width}}  {model_str:<{model_width}}  "
+            f"{in_str:>{token_width}}  {out_str:>{token_width}}  {latency_str:>10}  {status:>7}"
+        )
+        total_in += e.input_tokens or 0
+        total_out += e.output_tokens or 0
+        # Top-level only, same double-counting rationale as format_flow()'s
+        # Top-level time -- a nested entry's latency is already contained
+        # within its parent's window.
+        if e.parent_span_id is None:
+            if row_type == "Agent":
+                agent_time_ms += e.latency_ms or 0.0
+            else:
+                node_time_ms += e.latency_ms or 0.0
+
+    lines.append(separator)
+    lines.append(
+        f"{'LLM Total':<{name_width}}  {'':<{type_width}}  {'':<{model_width}}  "
+        f"{_fmt_int(total_in):>{token_width}}  {_fmt_int(total_out):>{token_width}}"
+    )
+    lines.append("")
+    lines.append(f"Agent time:       {agent_time_ms / 1000:.2f}s")
+    lines.append(f"Node time:        {node_time_ms / 1000:.2f}s")
+    turn_latency_ms = _turn_latency_ms(turn)
+    if turn_latency_ms is not None:
+        lines.append(f"End-to-end turn:  {turn_latency_ms / 1000:.2f}s")
+    return "\n".join(lines)
+
+
+def print_flow_summary(trace_id: Optional[str] = None) -> None:
+    print(format_flow_summary(trace_id))
