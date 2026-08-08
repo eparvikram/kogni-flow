@@ -96,6 +96,20 @@ def _fmt_text(value: Optional[str], width: int = _TEXT_WIDTH) -> str:
     return value if len(value) <= width else value[: width - 1] + "…"
 
 
+def _iteration_counts(executions: List[AgentTrace]) -> Dict[str, int]:
+    """How many times each Node/Agent name appears in this trace -- the
+    generic signal that a loop (e.g. a repair/retry edge routing back to
+    an earlier node) fired more than once, without this package needing
+    to know anything about what the loop means. Computed AFTER merging
+    (see _merge_node_agent_pairs) so a merged node+agent pair counts as
+    one occurrence per real iteration, not two. Only names that actually
+    repeated are returned -- a normal, loop-free flow has none."""
+    counts: Dict[str, int] = {}
+    for e in executions:
+        counts[e.agent_name] = counts.get(e.agent_name, 0) + 1
+    return {name: count for name, count in counts.items() if count > 1}
+
+
 def format_flow(trace_id: Optional[str] = None) -> str:
     trace_id = trace_id or current_trace_id()
     if not trace_id:
@@ -164,6 +178,14 @@ def format_flow(trace_id: Optional[str] = None) -> str:
     turn_latency_ms = _turn_latency_ms(turn)
     if turn_latency_ms is not None:
         lines.append(f"End-to-end turn:  {turn_latency_ms / 1000:.2f}s")
+
+    repeats = _iteration_counts(executions)
+    if repeats:
+        lines.append("")
+        lines.append("Iterations (ran more than once this turn -- e.g. a retry/repair loop):")
+        for name, count in repeats.items():
+            lines.append(f"  {name}: {count}x")
+
     return "\n".join(lines)
 
 

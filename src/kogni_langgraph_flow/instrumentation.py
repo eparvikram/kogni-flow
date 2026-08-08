@@ -76,6 +76,24 @@ class FlowCallbackHandler(BaseCallbackHandler):
         if not node_name:
             return  # the whole-graph wrapper, not an individual node
 
+        # LangGraph wraps ONE node's execution in two nested chain events
+        # that BOTH carry this same langgraph_node metadata tag -- verified
+        # directly via a raw callback trace, not assumed: an outer
+        # "graph:step:N" wrapper and an inner "seq:step:N" sub-chain, with
+        # the inner one starting AND ending before the node function's own
+        # real work runs. If our immediate parent is already a tracked span
+        # for this SAME node, this is that redundant inner re-wrap -- skip
+        # it entirely (don't track its start; its later on_chain_end will
+        # find nothing to finish in _starts and safely no-op) rather than
+        # recording it as a second, fake execution of the same node. Not
+        # aliased to the parent's entry either: the inner chain's END fires
+        # well before the real work is done, so finishing the parent's span
+        # here would record the wrong (too-short) latency and reset the
+        # span context before the node's actual body has even run.
+        if parent_run_id is not None and parent_run_id in self._starts:
+            if self._starts[parent_run_id]["node_name"] == node_name:
+                return
+
         trace_id = flow_context.current_trace_id() or flow_context.start_turn()
         parent_span_id = flow_context.current_span_id()
         # Full run_id, not truncated -- verified directly that truncating
