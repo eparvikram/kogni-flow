@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kogni-flow"
-version = "0.1.1"
+version = "0.1.2"
 description = "Auto-instrumentation for LangGraph apps -- enable_flow(app) traces every node and every pydantic-ai agent call, zero code changes at any call site."
 readme = "README.md"
 license = { text = "MIT" }
@@ -19,14 +19,17 @@ classifiers = [
     "Topic :: Software Development :: Debuggers",
 ]
 
-# langchain_core only -- LangGraph's own dependency, so already present in
-# any project this package is useful in. pydantic-ai is deliberately NOT a
-# hard dependency: the per-agent token/latency patch is best-effort and
-# activates only if pydantic_ai is importable (see instrumentation.py) --
-# node-level tracing works regardless of what LLM library is used inside
-# each node.
+# langchain_core + pydantic -- both already transitive dependencies of
+# langchain_core itself, but instrumentation.py imports pydantic.BaseModel
+# directly (to serialize a structured agent output_type), so it's listed
+# explicitly here rather than relying on that transitive availability.
+# pydantic-ai is deliberately NOT a hard dependency: the per-agent
+# token/latency patch is best-effort and activates only if pydantic_ai is
+# importable (see instrumentation.py) -- node-level tracing works
+# regardless of what LLM library is used inside each node.
 dependencies = [
     "langchain-core>=0.3",
+    "pydantic>=2.0",
 ]
 
 [project.optional-dependencies]

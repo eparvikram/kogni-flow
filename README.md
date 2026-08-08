@@ -52,7 +52,7 @@ Top-level time:   0.00s
 End-to-end turn:  0.02s
 ```
 
-(`Model` reads the real model identifier off the agent, e.g. `gpt-4o-mini` for a real OpenAI-backed agent — shown as `test` here since this example uses pydantic-ai's no-API-key test model. `Input`/`Output` are the real prompt/reply text, captured only for a plain-string pydantic-ai call — truncated to 32 characters, `-` for anything that isn't a plain string.)
+(`Model` reads the real model identifier off the agent, e.g. `gpt-4o-mini` for a real OpenAI-backed agent — shown as `test` here since this example uses pydantic-ai's no-API-key test model. `Input` is the real prompt text (only for a plain-string call — `-` for a message_history-based call with no new prompt). `Output` is the real reply: plain text as-is, or `model_dump_json()` when the agent has a structured `output_type` (a Pydantic model) — either way, truncated to 32 characters for display.)
 
 A plain LangGraph node whose only child is exactly one agent call is shown as a single row, not two — see [Node/agent merging](#nodeagent-merging) below for when that does and doesn't apply.
 

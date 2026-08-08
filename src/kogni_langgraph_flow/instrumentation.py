@@ -50,6 +50,7 @@ from typing import Any, Dict, Optional
 from uuid import UUID
 
 from langchain_core.callbacks import BaseCallbackHandler
+from pydantic import BaseModel
 
 from . import context as flow_context
 from . import tracer as flow_tracer
@@ -125,11 +126,22 @@ def _extract_prompt_text(args: Any, kwargs: Dict[str, Any]) -> Optional[str]:
 
 
 def _extract_output_text(result: Any) -> Optional[str]:
-    """result.output is only a plain string when the agent has no
-    output_type set -- a structured output_type gives back a Pydantic
-    model/dict instead, which is deliberately not stringified here."""
+    """result.output is a plain string when the agent has no output_type
+    set; a structured output_type gives back a Pydantic model (the
+    common case) or some other Python object instead. A Pydantic model
+    is serialized via model_dump_json() -- a real, readable
+    representation of the actual output, not a Python repr; anything
+    else non-string falls back to str(). Both get truncated for display
+    the same way plain-string output already is (see formatter.py) --
+    None only for a genuinely absent output."""
     output = getattr(result, "output", None)
-    return output if isinstance(output, str) else None
+    if output is None:
+        return None
+    if isinstance(output, str):
+        return output
+    if isinstance(output, BaseModel):
+        return output.model_dump_json()
+    return str(output)
 
 
 def _infer_caller_name(target: Any) -> Optional[str]:
